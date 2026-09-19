@@ -2,6 +2,8 @@
   "version": 2,
   "routes": [
     { "src": "/start",    "dest": "/api/start.js" },
+    { "src": "/bridge",   "dest": "/api/bridge.js" },
+    { "src": "/submit",   "dest": "/api/submit.js" },
     { "src": "/callback", "dest": "/api/callback.js" },
     { "src": "/",         "dest": "/api/index.js" }
   ]

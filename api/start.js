@@ -11,8 +11,11 @@
 import crypto from 'crypto';
 import { storeState } from './_state.js';
 
-// fortniteAndroidGameClient — can create device auth via the account endpoint
-const EPIC_CLIENT_ID = '3f69e56c7649492c8cc29f1af08a8a12';
+// fortnitePCGameClient — has NO redirect URL configured on Epic's side,
+// which means Epic does NOT validate the redirectUrl param against a whitelist.
+// This is the only known client that lets us redirect to an arbitrary URL.
+// After we get the auth code we exchange it to Android client to create device auth.
+const EPIC_CLIENT_ID = 'ec684b8c687f479fadea3cb2ad83f5c6';
 
 export default function handler(req, res) {
   const discordId = String(req.query.discord_id || 'UNKNOWN_USER').trim();

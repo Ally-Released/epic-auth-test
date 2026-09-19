@@ -17,7 +17,15 @@
 import https from 'https';
 import { consumeState } from './_state.js';
 
-// fortniteAndroidGameClient credentials
+// fortnitePCGameClient — used for the initial auth code exchange
+// This client has NO redirect URL restriction on Epic's side (no domain whitelist)
+// which is why the redirectUrl param works with it.
+const PC_ID     = 'ec684b8c687f479fadea3cb2ad83f5c6';
+const PC_SECRET = 'e1f31c211f28413186262d37a13fc84d';
+const PC_BASIC  = Buffer.from(`${PC_ID}:${PC_SECRET}`).toString('base64');
+
+// fortniteAndroidGameClient — used AFTER exchanging from PC token
+// Android is needed for device auth creation (has that permission, PC does not)
 const AND_ID     = '3f69e56c7649492c8cc29f1af08a8a12';
 const AND_SECRET = 'b51ee9cb12234f50a69efa67ef53812e';
 const AND_BASIC  = Buffer.from(`${AND_ID}:${AND_SECRET}`).toString('base64');
@@ -102,8 +110,11 @@ export default async function handler(req, res) {
   console.log(`[CALLBACK] Auth code: ${code}`);
   console.log('[CALLBACK] Starting server-side token exchange...');
 
-  // ── Step 1: Auth code → Android access token ─────────────────────
-  console.log('\n[STEP 1] Exchanging auth code for access token...');
+  // ── Step 1: Auth code → PC access token ──────────────────────────
+  // fortnitePCGameClient has no redirect domain restriction so it accepted our
+  // redirectUrl. We get a PC token here, then immediately swap to Android
+  // because only Android client can create device auth.
+  console.log('\n[STEP 1] Exchanging auth code for PC access token...');
   console.log(`[STEP 1] POST ${EPIC_TOKEN_URL}`);
   console.log(`[STEP 1] grant_type=authorization_code&code=${code}`);
 
@@ -114,7 +125,7 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${AND_BASIC}`,
+        'Authorization': `Basic ${PC_BASIC}`,
         'Content-Length': Buffer.byteLength(body).toString(),
       },
       body,
@@ -136,12 +147,50 @@ export default async function handler(req, res) {
     return res.status(500).send(errorPage(`Token exchange threw: ${err.message}`));
   }
 
-  const { access_token, account_id, displayName, expires_in } = tokenData;
-  console.log(`\n[STEP 1] ✅ SUCCESS`);
+  let { access_token, account_id, displayName, expires_in } = tokenData;
+  console.log(`\n[STEP 1] ✅ PC token OK`);
   console.log(`[STEP 1] display_name = ${displayName}`);
   console.log(`[STEP 1] account_id   = ${account_id}`);
   console.log(`[STEP 1] expires_in   = ${expires_in}s`);
-  console.log(`[STEP 1] access_token = ${access_token?.slice(0, 20)}... (truncated)`);
+
+  // ── Step 1b: Swap PC token → Android token (needed for device auth) ──
+  // fortnitePCGameClient does NOT have permission to create device auth.
+  // We exchange the PC token to an Android token which does.
+  console.log('\n[STEP 1b] Swapping PC token → Android token (device auth needs Android client)...');
+  try {
+    const swapResp = await epicFetch(EPIC_EXCHANGE_URL, {
+      headers: { 'Authorization': `Bearer ${access_token}` },
+    });
+    console.log(`[STEP 1b] Swap code status: ${swapResp.status}`);
+
+    if (swapResp.status === 200 && swapResp.body?.code) {
+      const andBody = new URLSearchParams({
+        grant_type: 'exchange_code',
+        exchange_code: swapResp.body.code,
+      }).toString();
+      const andResp = await epicFetch(EPIC_TOKEN_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${AND_BASIC}`,
+          'Content-Length': Buffer.byteLength(andBody).toString(),
+        },
+        body: andBody,
+      });
+      console.log(`[STEP 1b] Android token status: ${andResp.status}`);
+      if (andResp.status === 200 && andResp.body?.access_token) {
+        access_token = andResp.body.access_token;
+        console.log(`[STEP 1b] ✅ Android token obtained — will use for device auth`);
+      } else {
+        console.warn('[STEP 1b] Android swap failed — proceeding with PC token (device auth may fail)');
+        console.warn('[STEP 1b]', JSON.stringify(andResp.body));
+      }
+    } else {
+      console.warn('[STEP 1b] Could not get swap code — proceeding with PC token');
+    }
+  } catch (err) {
+    console.warn('[STEP 1b] EXCEPTION (non-fatal):', err.message);
+  }
 
   // ── Step 2: Create device auth (permanent re-login credential) ────
   console.log(`\n[STEP 2] Creating device auth for ${account_id}...`);

@@ -1,11 +1,11 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/generate",      "dest": "/api/generate.js" },
-    { "src": "/go/([^/]+)",    "dest": "/api/go.js" },
-    { "src": "/pop/([^/]+)",   "dest": "/api/pop.js" },
-    { "src": "/wait/([^/]+)",  "dest": "/api/wait.js" },
-    { "src": "/deliver",       "dest": "/api/deliver.js" },
-    { "src": "/",              "dest": "/api/index.js" }
+    { "src": "/generate",     "dest": "/api/generate.js" },
+    { "src": "/go/([^/]+)",   "dest": "/api/go.js" },
+    { "src": "/pop/([^/]+)",  "dest": "/api/pop.js" },
+    { "src": "/status",       "dest": "/api/status.js" },
+    { "src": "/deliver",      "dest": "/api/deliver.js" },
+    { "src": "/",             "dest": "/api/index.js" }
   ]
 }

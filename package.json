@@ -1,0 +1,9 @@
+{
+  "name": "epic-auth-test",
+  "version": "1.0.0",
+  "description": "Epic Games auth code capture test — Vercel hosted",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}

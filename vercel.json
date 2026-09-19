@@ -1,10 +1,11 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/start",    "dest": "/api/start.js" },
-    { "src": "/bridge",   "dest": "/api/bridge.js" },
-    { "src": "/submit",   "dest": "/api/submit.js" },
-    { "src": "/callback", "dest": "/api/callback.js" },
-    { "src": "/",         "dest": "/api/index.js" }
+    { "src": "/generate",      "dest": "/api/generate.js" },
+    { "src": "/go/([^/]+)",    "dest": "/api/go.js" },
+    { "src": "/pop/([^/]+)",   "dest": "/api/pop.js" },
+    { "src": "/wait/([^/]+)",  "dest": "/api/wait.js" },
+    { "src": "/deliver",       "dest": "/api/deliver.js" },
+    { "src": "/",              "dest": "/api/index.js" }
   ]
 }

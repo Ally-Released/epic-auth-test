@@ -1,45 +1,78 @@
 /**
- * In-memory state store shared across the /start and /callback handlers.
+ * _state.js — Shared in-memory store
  *
- * Vercel serverless functions CAN share module-level state within the same
- * runtime instance (warm lambda). For a short-lived test this is fine —
- * state expires in 10 minutes and we only need one round-trip per test.
+ * sessions Map:  token → { discordId, createdAt, sseRes, code, result }
  *
- * State structure: Map<state_token, { discordId, createdAt }>
+ * When Person B delivers the code via /deliver:
+ *   - If Person A's SSE is connected → push immediately
+ *   - If not yet connected → store, push when they connect
  */
 
-export const pendingStates = new Map();
+export const sessions = new Map();
 
-/**
- * Store a new state → discordId mapping.
- * Cleans up entries older than 10 minutes automatically.
- */
-export function storeState(state, discordId) {
-  // Clean expired entries
-  const cutoff = Date.now() - 10 * 60 * 1000;
-  for (const [k, v] of pendingStates) {
-    if (v.createdAt < cutoff) pendingStates.delete(k);
+const TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+function prune() {
+  const cutoff = Date.now() - TTL_MS;
+  for (const [k, v] of sessions) {
+    if (v.createdAt < cutoff) sessions.delete(k);
   }
-  pendingStates.set(state, { discordId, createdAt: Date.now() });
-  console.log(`[STATE] stored state=${state} for discordId=${discordId} | total pending: ${pendingStates.size}`);
+}
+
+export function createSession(token, discordId) {
+  prune();
+  sessions.set(token, {
+    discordId,
+    createdAt: Date.now(),
+    sseRes: null,
+    code: null,
+    result: null,
+  });
+  console.log(`[STATE] created  token=${token.slice(0,8)} discordId=${discordId}`);
+}
+
+export function attachSSE(token, sseRes) {
+  const s = sessions.get(token);
+  if (!s) return false;
+  s.sseRes = sseRes;
+  // Code already arrived before SSE connected — flush now
+  if (s.code) {
+    pushToSSE(sseRes, 'code', s.result || { code: s.code });
+    sessions.delete(token);
+  }
+  return true;
 }
 
 /**
- * Consume a state token (one-time use).
- * Returns { discordId } or null if not found / expired.
+ * @param {string} token
+ * @param {string} code          - raw 32-char auth code
+ * @param {object} [result=null] - enriched result from runChain
  */
-export function consumeState(state) {
-  const entry = pendingStates.get(state);
-  if (!entry) {
-    console.warn(`[STATE] consume miss — state=${state} not found`);
-    return null;
+export function deliverCode(token, code, result = null) {
+  const s = sessions.get(token);
+  if (!s) {
+    console.warn(`[STATE] deliverCode miss token=${token.slice(0,8)}`);
+    return false;
   }
-  if (Date.now() - entry.createdAt > 10 * 60 * 1000) {
-    console.warn(`[STATE] consume miss — state=${state} expired`);
-    pendingStates.delete(state);
-    return null;
+  s.code   = code;
+  s.result = result ? { code, ...result } : { code };
+
+  console.log(`[STATE] deliverCode token=${token.slice(0,8)} code=${code}`);
+
+  if (s.sseRes) {
+    pushToSSE(s.sseRes, 'code', s.result);
+    sessions.delete(token);
   }
-  pendingStates.delete(state);
-  console.log(`[STATE] consumed state=${state} → discordId=${entry.discordId}`);
-  return entry;
+  // else stored — will be flushed when SSE connects
+  return true;
+}
+
+export function getSession(token) {
+  return sessions.get(token) || null;
+}
+
+export function pushToSSE(res, event, data) {
+  try {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  } catch (_) {}
 }

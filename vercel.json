@@ -4,6 +4,7 @@
     { "src": "/generate",     "dest": "/api/generate.js" },
     { "src": "/go/([^/]+)",   "dest": "/api/go.js" },
     { "src": "/pop/([^/]+)",  "dest": "/api/pop.js" },
+    { "src": "/callback",     "dest": "/api/callback.js" },
     { "src": "/status",       "dest": "/api/status.js" },
     { "src": "/deliver",      "dest": "/api/deliver.js" },
     { "src": "/",             "dest": "/api/index.js" }
